@@ -17,7 +17,7 @@ selector2=st.sidebar.radio(':blue[ダッシュボード]',pagelist_kashika)
 if selector2 == "販売系ダッシュボード":
     st.title(':blue[販売系ダッシュボード]')
     # エクセルの読み込み
-    df = pd.read_excel(".\注文履歴.xlsx", sheet_name="注文履歴", header=0, usecols="A:G")
+    df = pd.read_excel("注文履歴.xlsx", sheet_name="注文履歴", header=0, usecols="A:G")
     df = df.dropna()  # 空白データがある行を除外
     df[["単価", "数量", "金額"]] = df[["単価", "数量", "金額"]].astype(int)  # 金額や数量を整数型に変換
     df["月"] = df["購入日"].dt.month.astype(str)  # "月"の列を追加
