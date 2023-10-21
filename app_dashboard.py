@@ -13,7 +13,7 @@ import plotly.express as px
 
 app = hy.HydraApp(title='Simple Multi-Page App')
 
-@app.addapp()
+@app.addapp(title='販売系')
 def my_home():
     #hy.info('Hello from app1')
     st.title(':blue[販売系ダッシュボード]')
@@ -106,7 +106,7 @@ def my_home():
         col2.dataframe(detail_df[view_columns], height=view_h+200)
 
 
-@app.addapp()
+@app.addapp(title='製造系')
 def app2():
     #hy.info('Hello from app 2')
     st.title(':blue[製造系ダッシュボード]')
