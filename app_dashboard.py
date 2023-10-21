@@ -107,7 +107,7 @@ def my_home():
 
 
 @app.addapp()
-def app():
+def app2():
     #hy.info('Hello from app 2')
     st.title(':blue[製造系ダッシュボード]')
     # carsデータセットの読み込み
@@ -192,6 +192,9 @@ def app():
     right_column.altair_chart(line2, use_container_width=True)
 
 
+@app.addapp(title='The Best', icon="🥰")
+def app3():
+    hy.info('Hello from app 3, A.K.A, The Best 🥰')
 
 #Run the whole lot, we get navbar, state management and app isolation, all with this tiny amount of work.
 app.run()
