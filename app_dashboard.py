@@ -107,8 +107,8 @@ def my_home():
 
 
 @app.addapp()
-def app2():
-    hy.info('Hello from app 2')
+def app():
+    #hy.info('Hello from app 2')
     st.title(':blue[製造系ダッシュボード]')
     # carsデータセットの読み込み
     df = data.cars()
