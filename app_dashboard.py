@@ -126,20 +126,20 @@ def app2():
     max_year = df['YYYY'].max().item()
 
     # サイドバー
-    st.sidebar.title("Dashboard of Cars Dataset")
-    st.sidebar.markdown('###')
-    st.sidebar.markdown("### *Settings*")
-    start_year, end_year = st.sidebar.slider(
+    st.title("Dashboard of Cars Dataset")
+    st.markdown('###')
+    st.markdown("### *Settings*")
+    start_year, end_year = st.slider(
         "Period",
         min_value=min_year, max_value=max_year,
         value=(min_year, max_year))
 
     st.sidebar.markdown('###')
-    origins = st.sidebar.multiselect('Origins', origin_list,
+    origins = st.multiselect('Origins', origin_list,
                                     default=origin_list)
-    st.sidebar.markdown('###')
-    item1 = st.sidebar.selectbox('Item 1', item_list, index=0)
-    item2 = st.sidebar.selectbox('Item 2', item_list, index=3)
+    st.markdown('###')
+    item1 = st.selectbox('Item 1', item_list, index=0)
+    item2 = st.selectbox('Item 2', item_list, index=3)
 
     df_rng = df[(df['YYYY'] >= start_year) & (df['YYYY'] <= end_year)]
     source = df_rng[df_rng['Origin'].isin(origins)]
