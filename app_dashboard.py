@@ -1,4 +1,15 @@
 import hydralit as hy
+from datetime import datetime as dt
+import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.graph_objs as go
+from plotly.subplots import make_subplots
+from japanmap import picture
+import streamlit as st
+import altair as alt
+from vega_datasets import data
+from datetime import date
+import plotly.express as px
 
 app = hy.HydraApp(title='Simple Multi-Page App')
 
