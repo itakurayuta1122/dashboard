@@ -129,7 +129,7 @@ def app2():
     st.title("Dashboard of Cars Dataset")
     st.markdown('###')
     st.markdown("### *Settings*")
-    start_year, end_year = st.sidebar(
+    start_year, end_year = st.slider(
         "Period",
         min_value=min_year, max_value=max_year,
         value=(min_year, max_year))
