@@ -129,12 +129,12 @@ def app2():
     st.title("Dashboard of Cars Dataset")
     st.markdown('###')
     st.markdown("### *Settings*")
-    start_year, end_year = st.slider(
+    start_year, end_year = st.sidebar(
         "Period",
         min_value=min_year, max_value=max_year,
         value=(min_year, max_year))
 
-    st.sidebar.markdown('###')
+    st.markdown('###')
     origins = st.multiselect('Origins', origin_list,
                                     default=origin_list)
     st.markdown('###')
