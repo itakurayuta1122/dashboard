@@ -64,9 +64,9 @@ if tabs =='MI':
         alg_list = []
         st.info('複数目的変数最適化')
         reveth_num = 2
-        df = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\boston.csv", header=0)
+        df = pd.read_csv("boston.csv", header=0)
         df_columns_name = df.columns    
-        df_test = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\tes.csv", header=0)
+        df_test = pd.read_csv("tes.csv", header=0)
         df_test = df_test.set_index('index')
         random_state_select_count = []
         generate_count = st.session_state.start_count * 10
@@ -107,7 +107,7 @@ if tabs =='MI':
                 generate_int += 1
             st.write(st.session_state.start_count)
             if test_data_pred:
-                df_test_pred = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\boston_test.csv", header=0)
+                df_test_pred = pd.read_csv("boston_test.csv", header=0)
             for i in range(1,reveth_num):
                 r2_max_sum = []
                 for target in target_list:
