@@ -44,7 +44,7 @@ st.set_page_config(layout="wide")
 
 streamlit_float.float_init(include_unstable_primary=False)
 
-st.markdown('<style>' + open(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\style.css").read() + '</style>', unsafe_allow_html=True)
+st.markdown('<style>' + open("style.css").read() + '</style>', unsafe_allow_html=True)
 
 
 
