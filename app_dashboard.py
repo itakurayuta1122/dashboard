@@ -1,270 +1,502 @@
-import hydralit as hy
-from datetime import datetime as dt
-import matplotlib.pyplot as plt
+import csv
+import streamlit as st
+from st_on_hover_tabs import on_hover_tabs
+import streamlit_float
 import pandas as pd
+import plotly.express as px
+import altair as alt
+import matplotlib.pyplot as plt
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
-from japanmap import picture
-import streamlit as st
-import altair as alt
-from vega_datasets import data
 from datetime import date
-import plotly.express as px
+from datetime import datetime as dt
+import numpy as np
+import xgboost as xgb
+import catboost as cb
+import lightgbm as lgbm
+from sklearn.metrics import r2_score
+from sklearn.linear_model import Lasso
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_squared_error
+from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
+from sklearn.model_selection import train_test_split
+from catboost import CatBoost
+from catboost import Pool
+import time
 
-app = hy.HydraApp(title='Simple Multi-Page App')
+if 'random_state_num' not in st.session_state:
+    st.session_state.random_state_num = 0
+if 'start_count' not in st.session_state: 
+    st.session_state.start_count = 1 #countがsession_stateに追加されていない場合，0で初期化
 
-@app.addapp(title='販売系')
-def my_home():
-    #hy.info('Hello from app1')
-    st.title(':blue[販売系ダッシュボード]')
-    # エクセルの読み込み
-    df = pd.read_excel("注文履歴.xlsx", sheet_name="注文履歴", header=0, usecols="A:G")
-    df = df.dropna()  # 空白データがある行を除外
-    df[["単価", "数量", "金額"]] = df[["単価", "数量", "金額"]].astype(int)  # 金額や数量を整数型に変換
-    df["月"] = df["購入日"].dt.month.astype(str)  # "月"の列を追加
-    df["購入日|部署"] = df["購入日"].astype(str).str.cat(df["部署"], sep="|")  # "購入日|部署" 列を追加
+if 'state_const_num' not in st.session_state:
+    st.session_state.state_const_num = ''
 
-    view_columns = ['購入日', '部署', '品名', '単価', '数量', '金額']
+st.set_page_config(layout="wide")
 
+streamlit_float.float_init(include_unstable_primary=False)
 
-    # 現在の年月を取得
-    today = date.today()
-    this_year = today.year
-    this_month = today.month
-    this_year = 2022  # サンプルCSVをそのまま使用する場合はこの行のコメントを解除してください
-    this_month = 9  # サンプルCSVをそのまま使用する場合はこの行のコメントを解除してください
-
-    st.title(f"{this_year}年{this_month}月")
-
-    # 4カラム表示
-    col1, col2, col3, col4 = st.columns(4)
-    # 今年の購入回数
-    this_year_counts = df.loc[df["購入日"].dt.year == this_year, "購入日|部署"].nunique()
-    col1.metric("📝今年の購入回数", f"{this_year_counts}回")
-    # 今年の購入額
-    this_year_purchase = df.loc[df["購入日"].dt.year == this_year, "金額"].sum()
-    col2.metric("💰今年の購入額", f"{this_year_purchase}円")
-    # 今月の購入回数
-    this_month_counts = df.loc[df["購入日"].dt.month == this_month, "購入日|部署"].nunique()
-    col3.metric("📝今月の購入回数", f"{this_month_counts}回")
-    # 今月の購入額
-    this_month_purchase = df.loc[df["購入日"].dt.month == this_month, "金額"].sum()
-    col4.metric("💰今月の購入額", f"{this_month_purchase}円")
+st.markdown('<style>' + open(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\style.css").read() + '</style>', unsafe_allow_html=True)
 
 
-    # 3カラム表示 (1:2:2)
-    col1, col2, col3 = st.columns([1, 2, 2])
-    # 購入数TOP10
-    many_df = df.groupby(by="品名").sum(numeric_only=True).sort_values(by="数量", ascending=False).reset_index()
-    col1.subheader("購入数TOP10")
-    col1.table(many_df[["品名", "単価", "数量", "金額"]].iloc[:10])
-    # 部署別購入金額
-    department_group_df = df.groupby(["部署", "月"]).sum(numeric_only=True)
-    fig = px.bar(department_group_df.reset_index(), x="金額", y="部署", color="月", orientation="h")
-    col2.subheader("部署別購入金額")
-    col2.plotly_chart(fig, use_container_width=True)
-    # 直近3件の購入
-    recent_df = df[df["購入日|部署"].isin(sorted(df["購入日|部署"].unique())[-3:])]
-    recent_df["購入日"] = recent_df["購入日"].dt.strftime("%Y-%m-%d")
-    col3.subheader("直近3件の購入")
-    col3.table(recent_df[view_columns])
 
-    # 月ごとの購入金額推移
-    month_group_df = df.groupby(["月", "部署"]).sum(numeric_only=True)
-    fig = px.bar(month_group_df.reset_index(), x="月", y="金額", color="部署", title="月別購入金額")
-    st.plotly_chart(fig, use_container_width=True)
+with st.sidebar:
+    tabs = on_hover_tabs(tabName=['MI', '-------', '-------'], 
+                         iconName=['home', 'search', 'settings'], default_choice=0)
 
+if tabs =='MI':
+    tab1, tab2, tab3, tab4 = st.tabs(["複数目的変数最適化", "bbb", "ccc", "ddd"])
+    append_list = []
+    with tab1:
+        test_data_pred = False
+        depl_test_x = ""
+        depl_test_y = ""      
+        target_count = 0
+        count = 0
+        alg_list = []
+        st.info('複数目的変数最適化')
+        reveth_num = 2
+        df = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\boston.csv", header=0)
+        df_columns_name = df.columns    
+        df_test = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\tes.csv", header=0)
+        df_test = df_test.set_index('index')
+        random_state_select_count = []
+        generate_count = st.session_state.start_count * 10
+        generate_int = 0
+        for i in range(0,generate_count):
+           if i == 0:
+               random_state_select_count.append('')
+           random_state_select_count.append(generate_int)
+           generate_int += 1
+        #state_const_num = st.selectbox('random_stateを選択',random_state_select_count,key=1)
+        if st.session_state.state_const_num == '':
+            reveth_num = 11
+        else:
+            random_state_num = state_const_num
+        df_autoscaled = (df - df.mean(axis=0)) / df.std(axis=0, ddof=1)
+        df_autoscaled = df
+        target_list = st.multiselect('目的変数を選択',df_columns_name)
+        st.write("state_const_num")
+        st.write(st.session_state.state_const_num)
+        if st.session_state.state_const_num != '':
+            for y in target_list:
+                st.write(y)
+                alg_list.append(st.radio('アルゴリズム', ("xgb","lgbm","cat","gpr","gbr","rf","lasso","ridge","lr","ex","knr","dt","el"), horizontal=True, key=count))
+                count += 1
+            #st.dataframe(alg_list)
+            #検証用アルゴリズムの確認
+            test_data_pred = st.button('test_data_pred')
 
-    # 詳細表示
-    with st.expander("詳細データ"):
-        # 表示する期間の入力
-        min_date = df["購入日"].min().date()
-        max_date = df["購入日"].max().date()
-        start_date, end_date = st.slider(
-            "表示する期間を入力",
-            min_value=min_date,
-            max_value=max_date,
-            value=(min_date, max_date),
-            format="YYYY/MM/DD")
-
-        col1, col2 = st.columns(2)
-
-        # 表示する部署の選択
-        departments = df["部署"].unique()
-        select_departments = col1.multiselect("表示部署", options=departments, default=departments)
-
-        df["購入日"] = df["購入日"].apply(lambda x: x.date())
-        detail_df = df[(start_date <= df["購入日"]) & (df["購入日"] <= end_date) & (df["部署"].isin(select_departments))]
-
-        productname_group_df = detail_df.groupby(["品名", "部署"]).sum(numeric_only=True)
-        view_h = len(productname_group_df)*15
-        fig = px.bar(productname_group_df.reset_index(), x="金額", y="品名", color="部署", orientation="h", title="購入品別購入金額", height=view_h+300, width=600)
-        fig.update_layout(yaxis={'categoryorder':'total ascending'})
-        col1.plotly_chart(fig, use_container_width=True)
-
-        col2.subheader("購入一覧")
-        col2.dataframe(detail_df[view_columns], height=view_h+200)
-
-
-@app.addapp(title='製造系')
-def app2():
-    #hy.info('Hello from app 2')
-    st.title(':blue[製造系ダッシュボード]')
-    # carsデータセットの読み込み
-    df = data.cars()
-
-    # 定量データ項目のリスト
-    item_list = [
-        col for col in df.columns if df[col].dtype in ['float64', 'int64']]
-
-    # 製造地域のリスト
-    origin_list = list(df['Origin'].unique())
-
-    # 西暦列の作成
-    df['YYYY'] = df['Year'].apply(lambda x: x.year)
-    min_year = df['YYYY'].min().item()
-    max_year = df['YYYY'].max().item()
-
-    # サイドバー
-    st.title("Dashboard of Cars Dataset")
-    st.markdown('###')
-    st.markdown("### *Settings*")
-    start_year, end_year = st.slider(
-        "Period",
-        min_value=min_year, max_value=max_year,
-        value=(min_year, max_year))
-
-    st.markdown('###')
-    origins = st.multiselect('Origins', origin_list,
-                                    default=origin_list)
-    st.markdown('###')
-    item1 = st.selectbox('Item 1', item_list, index=0)
-    item2 = st.selectbox('Item 2', item_list, index=3)
-
-    df_rng = df[(df['YYYY'] >= start_year) & (df['YYYY'] <= end_year)]
-    source = df_rng[df_rng['Origin'].isin(origins)]
-
-    # コンテンツ
-    base = alt.Chart(source).properties(height=300)
-
-    bar = base.mark_bar().encode(
-        x=alt.X('count(Origin):Q', title='Number of Records'),
-        y=alt.Y('Origin:N', title='Origin'),
-        color=alt.Color('Origin:N', legend=None)
-    )
-
-    point = base.mark_circle(size=50).encode(
-        x=alt.X(item1 + ':Q', title=item1),
-        y=alt.Y(item2 + ':Q', title=item2),
-        color=alt.Color('Origin:N', title='',
-                        legend=alt.Legend(orient='bottom-left'))
-    )
-
-    line1 = base.mark_line(size=5).encode(
-        x=alt.X('yearmonth(Year):T', title='Date'),
-        y=alt.Y('mean(' + item1 + '):Q', title=item1),
-        color=alt.Color('Origin:N', title='',
-                        legend=alt.Legend(orient='bottom-left'))
-    )
-
-    line2 = base.mark_line(size=5).encode(
-        x=alt.X('yearmonth(Year):T', title='Date'),
-        y=alt.Y('mean(' + item2 + '):Q', title=item2),
-        color=alt.Color('Origin:N', title='',
-                        legend=alt.Legend(orient='bottom-left'))
-    )
-
-    # レイアウト (コンテンツ)
-    left_column, right_column = st.columns(2)
-
-    left_column.markdown(
-        '**Number of Records (' + str(start_year) + '-' + str(end_year) + ')**')
-    left_column.altair_chart(bar, use_container_width=True)
-
-    right_column.markdown(
-        '**Scatter Plot of _' + item1 + '_ and _' + item2 + '_**')
-    right_column.altair_chart(point, use_container_width=True)
-
-    left_column.markdown('**_' + item1 + '_ (Monthly Average)**')
-    left_column.altair_chart(line1, use_container_width=True)
-
-    right_column.markdown('**_' + item2 + '_ (Monthly Average)**')
-    right_column.altair_chart(line2, use_container_width=True)
-
-
-@app.addapp(title='医療系')
-def app3():
-    hy.info('Hello from app 3, A.K.A, The Best 🥰')
-    st.title(':blue[医療系ダッシュボード]')
-    #オープンデータのURL 使用していないものもある
-    newly_confirmed_cases_daily = "https://covid19.mhlw.go.jp/public/opendata/newly_confirmed_cases_daily.csv"
-    requiring_inpatient_care_etc_daily = "https://covid19.mhlw.go.jp/public/opendata/requiring_inpatient_care_etc_daily.csv"
-    deaths_cumulative_daily = "https://covid19.mhlw.go.jp/public/opendata/deaths_cumulative_daily.csv"
-    severe_cases_daily = "https://covid19.mhlw.go.jp/public/opendata/severe_cases_daily.csv"
-    population = "https://www.e-stat.go.jp/stat-search/file-download?statInfId=000032110815&fileKind=0"
-
-    #オープンデータを読み込みデータフレームを作成
-    df01 = pd.read_csv(newly_confirmed_cases_daily, index_col="Date")
-    df01.index = pd.DatetimeIndex(df01.index).date
-    df02 = pd.read_csv(severe_cases_daily, index_col="Date")
-    df02.index = pd.DatetimeIndex(df02.index).date
-    df03 = pd.read_csv(deaths_cumulative_daily, index_col="Date")
-    df03.index = pd.DatetimeIndex(df03.index).date
-
-    prefecture_slection = st.multiselect("都道府県を選択してください", df01.columns, default="ALL")
-
-    min_period = df01.index.min()
-    start_period = st.slider("開始日付",df01.index.min(), df01.index.max(),value=df01.index.min())
-    end_period = st.slider("終了日付",df01.index.min(), df01.index.max(), df01.index.max())
-
-    df02["Fukushima"] = pd.to_numeric(df02["Fukushima"],errors="coerce")
-    df02["Saitama"] = pd.to_numeric(df02["Saitama"],errors="coerce")
-    df02["Chiba"] = pd.to_numeric(df02["Chiba"],errors="coerce")
-    df02["Ehime"] = pd.to_numeric(df02["Ehime"],errors="coerce")
-    df02=df02.fillna(0)
-    #移動平均の設定
-    moving_average = st.slider("移動平均の日数",1, 30,value=7)
-    df01 = df01.rolling(moving_average, min_periods=1).mean().round(1)
-    df02 = df02.rolling(moving_average, min_periods=1).mean().round(1)
-
-    fig= make_subplots(specs=[[{"secondary_y": True}]])
-    pre = prefecture_slection
-
-    for idx, prefecture in enumerate(pre):
-        fig.add_trace(go.Bar(x=df01.index, y=df01[prefecture],name=(prefecture + "_新規陽性者数")))
-        fig.add_trace(go.Bar(x=df02.index, y=df02[prefecture], name=(prefecture + "_重症者数")))
-        fig.update_layout(barmode='overlay', xaxis=dict(range=(start_period, end_period)))
-        fig.add_trace(go.Scatter(x=df03.index, y=df03[prefecture], name=(prefecture + "_累計死者数")))
+        start_button = st.button('start')
+        if (start_button or test_data_pred) and target_list != '':
+            st.session_state.start_count += 1
+            if st.session_state.start_count >= 2:
+                st.session_state.state_const_num = st.selectbox('random_stateを選択',random_state_select_count,key=2)
+            for i in range(0,generate_count):
+                if i == 0:
+                    random_state_select_count.append('')
+                random_state_select_count.append(generate_int)
+                generate_int += 1
+            st.write(st.session_state.start_count)
+            if test_data_pred:
+                df_test_pred = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\app_mi2\boston_test.csv", header=0)
+            for i in range(1,reveth_num):
+                r2_max_sum = []
+                for target in target_list:
+                    alg_text = ""
+                    if len(alg_list) > 0:
+                        alg_text = alg_list[target_count]
+                    append_list = []
+                    df_autoscaled["target"] = df_autoscaled[target]
+                    df_select_target = df_autoscaled.drop(target_list,axis=1)
+                    #df_select_target = df_autoscaled.drop(target,axis=1)
+                    features = [c for c in df_select_target.columns if c != '' "target"]   
+                    train, test = train_test_split(df_select_target, test_size = 0.1, random_state=st.session_state.random_state_num)
                     
-    st.plotly_chart(fig, use_container_width=True)
+                    #学習用データ
+                    X_train = train[features]
+                    y_train = train["target"].values
+                    
+                    #検証用データ
+                    X_test = test[features]
+                    X_test_depl = X_test
+                    X_test_depl = X_test_depl.reset_index()
+                    del X_test_depl["index"]
+                    if target_list.index(target) == 0:
+                        depl_test_x = X_test_depl
+                        if test_data_pred:
+                            depl_test_x = df_test_pred
+                        #for i in range(1,len(target_list)):
+                            #del depl_test_x[target_list[i]]
+                    y_test = test["target"].values
+        
+                    #Lasso用スケールしてないデータ
+                    df["target"] = df[target]
+                    #df_select_target_anscale = df.drop(target_list,axis=1)
+                    df_select_target_anscale = df.drop(target,axis=1)   
+                    train, test = train_test_split(df_select_target_anscale, test_size = 0.1, random_state=st.session_state.random_state_num)
+                    features_anscale = [c for c in df_select_target_anscale.columns if c != '' "target"]
+                    #学習用データ
+                    X_train_anscale = train[features_anscale]
+                    y_train_anscale = train["target"].values
+                    #検証用データ
+                    X_test_anscale = test[features_anscale]
+                    y_test_anscale = test["target"].values
+        
+        
+        
+        
+                    #xgboost予測開始
+                    # データ形式の変換
+                    dtrain = xgb.DMatrix(X_train, y_train)
+                    dtest = xgb.DMatrix(X_test, y_test)
+                    
+                    # パラメータ設定
+                    # regression: 回帰, squarederror: 二乗誤差
+                    params = {"objective": "reg:squarederror"}
+                    
+                    # 学習
+                    xgb_r = xgb.train(
+                        params = params,
+                        dtrain = dtrain,
+                        evals = [(dtrain, "train"), (dtest, "test")],
+                    )
+                
+                    y_train_preds = xgb_r.predict(dtrain)
+                    #st.write(target)
+                    #st.write("xgboost_target_train:")
+                    r2s = r2_score(y_train, y_train_preds)
+                    test_preds = xgb_r.predict(dtest)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "xgb":
+                        if test_data_pred:
+                            dtest = xgb.DMatrix(df_test_pred)
+                            test_preds = xgb_r.predict(dtest)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #xgboost予測終了
+                    #lightgbm予測開始
+                    # データ形式の変換		
+                    train_set = lgbm.Dataset(X_train, y_train)
+                    test_set = lgbm.Dataset(X_test, y_test)
+                    
+                    # パラメータ設定
+                    params = {"objective": "regression", # 回帰
+                              "metric": "rmse",          # 平均二乗誤差の平方根
+                              "verbosity": -1}           # warningなどを出力しない
+                    
+                    # 学習
+                    model_lgbm = lgbm.train(
+                        params = params,
+                        train_set = train_set,
+                        valid_sets = [train_set, test_set],
+                    )
+                
+                    preds_lgbm_train = model_lgbm.predict(X_train)
+                    #st.write(target)
+                    #st.write("lightgbm_target_train:")
+                    r2s = r2_score(y_train, preds_lgbm_train)
+                    test_preds = model_lgbm.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    #lightgbm予測終了
 
-    df_today = df01.iloc[-1]
-    df_today =df_today.rename({"Hokkaido":"北海道", 
-                            "Aomori":"青森","Akita":"秋田", "Iwate":"岩手", "Miyagi":"宮城","Yamagata":"山形", "Fukushima":"福島", 
-                            "Ibaraki":"茨城", "Tochigi":"栃木", "Gunma":"群馬", "Saitama":"埼玉", "Chiba":"千葉", "Tokyo":"東京", "Kanagawa":"神奈川",
-                            "Niigata":"新潟", "Toyama":"富山", "Ishikawa":"石川","Fukui":"福井", "Yamanashi":"山梨", "Nagano":"長野", 
-                            "Gifu":"岐阜","Shizuoka":"静岡", "Aichi":"愛知", "Mie":"三重",
-                            "Shiga":"滋賀", "Kyoto":"京都", "Osaka":"大阪","Hyogo":"兵庫", "Nara":"奈良", "Wakayama":"和歌山", 
-                            "Tottori":"鳥取","Shimane":"島根", "Okayama":"岡山", "Hiroshima":"広島", "Yamaguchi":"山口",
-                            "Kagawa":"香川", "Tokushima":"徳島","Ehime":"愛媛", "Kochi":"高知", 
-                            "Fukuoka":"福岡", "Saga":"佐賀", "Nagasaki":"長崎", "Kumamoto":"熊本", "Oita":"大分", "Miyazaki":"宮崎", "Kagoshima":"鹿児島", "Okinawa":"沖縄"})
+                    if alg_text == "lgbm":
+                        if test_data_pred:
+                            test_preds = model_lgbm.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #catboost予測開始
+                    # データセットを生成する
+                    train_pool = Pool(X_train, y_train)
+                    test_pool = Pool(X_test, y_test)
+                    
+                    #catboostのハイパーパラメータを設定する
+                    params = {'loss_function': 'RMSE',
+                             'num_boost_round': 1000,
+                             'early_stopping_rounds': 10,
+                             }
+                    
+                    # 上記のパラメータでモデルを学習する
+                    model_cat = CatBoost(params)
+                    model_cat.fit(train_pool, eval_set=[test_pool], use_best_model=True)
+                    
+                    y_pred_train = model_cat.predict(train_pool)
+                    #st.write(target)
+                    #st.write("catboost_target_train:")
+                    r2s = r2_score(y_train, y_pred_train)
+                    test_preds = model_cat.predict(test_pool)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
 
-    df_today = df_today[1:]
+                    if alg_text == "cat":
+                        if test_data_pred:
+                            dtest = Pool(df_test_pred)
+                            test_preds = model_cat.predict(dtest)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #catboost予測終了
+                    #GaussianProcessReg予測開始
+                    kernel = DotProduct() + WhiteKernel()
+                    gpr = GaussianProcessRegressor(kernel=kernel).fit(X_train, y_train)
+                    gpr_pred_train_y = gpr.predict(X_train)
+                    r2s = r2_score(y_train, gpr_pred_train_y)
+                    test_preds = gpr.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "gpr":
+                        if test_data_pred:
+                            test_preds = gpr.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #GaussianProcessReg予測終了
+                    #GradientBoostingReg予測開始
+                    gbr = GradientBoostingRegressor().fit(X_train,y_train)
+                    gbr_pred_tarin_y = gbr.predict(X_train)
+                    r2s = r2_score(y_train, gbr_pred_tarin_y)
+                    test_preds = gbr.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "gbr":
+                        if test_data_pred:
+                            test_preds = gbr.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #GradientBoostingReg予測終了
+                    #RandomForest予測
+                    rfr = RandomForestRegressor(n_estimators=100, criterion='squared_error', max_depth=None)
+                    rfr.fit(X_train, y_train)
+                    
+                    test_pool = Pool(X_test, y_test)
+                    
+                    # 学習データの件数を指定する
+                    train_size = len(X_train)
+                    test_size = df.shape[0] - train_size
+                    
+                    # 学習させたモデルを使ってテストデータに対する予測を出力する
+                    pred_random_train_y = rfr.predict(X_train)
+                    r2s = r2_score(y_train, pred_random_train_y)
+                    test_preds = rfr.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "rf":
+                        if test_data_pred:
+                            test_preds = rfr.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #RandomForest予測終了
+                    #Lasso予測開始
+                    lasso = Lasso()
+                    lasso.fit(X_train, y_train)
+                    lasso_pred_train_y = lasso.predict(X_train)
+                    r2s = r2_score(y_train, lasso_pred_train_y )
+                    test_preds = lasso.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "lasso":
+                        if test_data_pred:
+                            test_preds = lasso.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #Lasso予測終了
+                    #ridge予測開始
+                    ridge = Ridge().fit(X_train, y_train)
+                    ridge_pred_train_y = ridge.predict(X_train)
+                    #st.write(target)
+                    #st.write("Ridge_target_train:")
+                    r2s = r2_score(y_train, ridge_pred_train_y)
+                    test_preds = ridge.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "ridge":
+                        if test_data_pred:
+                            test_preds = ridge.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #ridge予測終了
+                    #Linear予測開始
+                    reg_lr = LinearRegression()
+                    # 訓練データにモデルを適用する
+                    reg_lr.fit(X_train,y_train)
+                    reg_lr_train_y = reg_lr.predict(X_train)
+                    #st.write(target)
+                    #st.write("Linear_target_train:")
+                    r2s = r2_score(y_train, reg_lr_train_y)
+                    test_preds = reg_lr.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "lr":
+                        if test_data_pred:
+                            test_preds = reg_lr.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #Linear予測終了
+                    #Extratree予測開始
+                    exreg = ExtraTreesRegressor(n_estimators=100).fit(X_train, y_train)
+                    exreg_pred_train_y = exreg.predict(X_train)
+                    #st.write(target)
+                    #st.write("ExtraTrees_target_train:")
+                    r2s = r2_score(y_train, exreg_pred_train_y)
+                    test_preds = exreg.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "ex":
+                        if test_data_pred:
+                            test_preds = exreg.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
 
-    df_population = pd.read_excel(population, header = 5, skipfooter=1)
-    df_population = df_population.rename(columns = {"人":"人口"})
-    df_population = df_population[["都道府県名","人口"]].iloc[1:, :]
-    df_population["陽性患者数"] = df_today.values
-    df_population["人口あたりの陽性患者数"] = df_population["陽性患者数"] / df_population["人口"]
+                    #Extratree予測終了
+                    #KNeighbors予測開始
+                    knr = KNeighborsRegressor()
+                    knr.fit(X_train, y_train)
+                    knr_pred_train_y = knr.predict(X_train)
+                    r2s = r2_score(y_train, knr_pred_train_y)
+                    test_preds = knr.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "knr":
+                        if test_data_pred:
+                            test_preds = knr.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #KNeighbors予測終了
+                    #DecisionTree予測開始
+                    dtreg = DecisionTreeRegressor()
+                    dtreg = dtreg.fit(X_train, y_train)
+                    dtreg_pred_train_y = dtreg.predict(X_train)
+                    #st.write(target)
+                    #st.write("DecisionTree_target_train:")
+                    r2s = r2_score(y_train, dtreg_pred_train_y)
+                    test_preds = dtreg.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "dt":
+                        if test_data_pred:
+                            test_preds = dtreg.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #DecisionTree予測終了
+                    #ElasticNet予測開始
+                    elregr = ElasticNet()
+                    elregr.fit(X_train, y_train)
+                    elregr_pred_train_y = elregr.predict(X_train)
+                    r2s = r2_score(y_train, elregr_pred_train_y)
+                    test_preds = elregr.predict(X_test)
+                    r2s = round(r2_score(y_test, test_preds),2)
+                    append_list.append(r2s)
+                    if alg_text == "el":
+                        if test_data_pred:
+                            test_preds = elregr.predict(df_test_pred)
+                        test_preds = pd.DataFrame(test_preds)
+                        test_preds[target] = test_preds[0]
+                        del test_preds[0]
+                        X_test_depl = pd.concat([X_test_depl,test_preds], axis=1)
+                        if test_data_pred:
+                            X_test_depl = pd.concat([df_test_pred,test_preds], axis=1)
+                        depl_test_x = pd.concat([depl_test_x,test_preds], axis=1)
+                    #ElasticNet予測終了
+                    df_appand = pd.DataFrame(append_list)
+                    df_test[target] = append_list
+                    r2_max_sum.append(max(append_list))
+                    target_count += 1
+                    if st.session_state.state_const_num != '':
+                        st.write(X_test_depl)
+                if st.session_state.state_const_num != '':
+                    st.write(depl_test_x)
+                st.write("r2_max_sum")
+                st.write(sum(r2_max_sum))
+                st.write("random_state")
+                st.write(st.session_state.random_state_num)
+                st.session_state.random_state_num = st.session_state.random_state_num + 1
+                st.table(df_test.style.format(precision=2).highlight_max(axis=0))
 
-    #人口あたり新規陽性者総数
-    cmap = plt.get_cmap('Blues')
-    norm = plt.Normalize(vmin=df_population["人口あたりの陽性患者数"].min(), vmax=df_population["人口あたりの陽性患者数"].max())
-    fcol = lambda x: '#' + bytes(cmap(norm(x), bytes=True)[:3]).hex()
-    fig,ax = plt.subplots(figsize=(4,4))
-    plt.colorbar(plt.cm.ScalarMappable(norm, cmap),ax=ax)
-    plt.imshow(picture(df_population["人口あたりの陽性患者数"].apply(fcol)))
-    st.pyplot(fig)
-
-#Run the whole lot, we get navbar, state management and app isolation, all with this tiny amount of work.
-app.run()
+    with tab2:
+        st.header("A dog")
+        st.write('🐶')
+    with tab3:
+        st.header("A fox")
+        st.write('🦊')
+    with tab4:
+        st.header('A hamster')
+        st.write('🐹')
+elif tabs == '実験別検索ページ':
+    df_number = pd.read_csv(r"C:\Users\WDAGUtilityAccount\Desktop\excel\number.csv")
+    df_number = df_number.to_numpy().tolist()
+    df_number = sum(df_number, [])
+    number = st.selectbox('実験番号',df_number)
+    result_path = r"C:\Users\WDAGUtilityAccount\Desktop\excel\result\2222"+number+".csv"
+    result_path = result_path.replace("2222",'')
+    df_number_final = pd.read_csv(result_path,encoding='shift_jis')
+    st.write(df_number_final)
+elif tabs == 'Economy':
+    st.header('A hamster')
