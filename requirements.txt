@@ -14,3 +14,4 @@ streamlit-on-Hover-tabs==1.0.1
 xgboost==2.0.1
 streamlit-float==0.3.2
 lightgbm==4.1.0
+catboost==1.2.2
